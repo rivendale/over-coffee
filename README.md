@@ -4,7 +4,11 @@ Crumple a thought. Toss it in the mug. Deal with it in the morning.
 
 A mobile-first web game. Not a sleep app. Not a wellness tracker. No streaks, no scores, no account.
 
-**Play:** open `index.html` on a phone, or enable GitHub Pages on this repo (`main` / root).
+**Play:** [rivendale.github.io/over-coffee](https://rivendale.github.io/over-coffee/)
+
+On a phone: open that link, then Add to Home Screen.
+
+Pages deploys from `main` via `.github/workflows/pages.yml`. Every push republishes.
 
 ## Why this exists
 
