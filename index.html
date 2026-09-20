@@ -3,79 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#1A100C" />
+  <meta name="theme-color" content="#160e0a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Over Coffee" />
-  <meta name="description" content="Crumple a thought, toss it in the mug, deal with it in the morning." />
+  <meta name="description" content="Crumple it. Toss it. Coffee holds it." />
   <title>Over Coffee</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,420;0,9..144,600;1,9..144,420&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,420;0,9..144,560;1,9..144,420&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
   <div id="app">
     <canvas id="scene"></canvas>
-    <div class="flick-ghost" id="ghost"></div>
-    <header>
-      <div class="wordmark">Over Coffee<span>think about it later</span></div>
-      <button class="icon-btn" id="gear" aria-label="Settings">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
-      </button>
-    </header>
-    <div class="modes">
-      <button id="btnLater" class="on">Later</button>
-      <button id="btnMorning">Morning</button>
+    <p class="mark" id="mark">Over Coffee</p>
+    <p class="whisper" id="whisper"></p>
+    <div class="line" id="line">
+      <input id="thought" type="text" maxlength="120" placeholder="name it once" autocomplete="off" enterkeyhint="done" />
     </div>
-    <p class="hint" id="hint">Flick the scrap toward the mug</p>
-    <section class="sheet open" id="compose">
-      <label for="thought">What’s in the way</label>
-      <textarea id="thought" maxlength="180" placeholder="One line is enough" enterkeyhint="done"></textarea>
-      <div class="row">
-        <label for="sip">Next sip — optional</label>
-        <input id="sip" type="text" maxlength="80" placeholder="The smallest morning move" />
-      </div>
-      <div class="actions">
-        <button class="btn primary" id="crumple">Crumple</button>
-      </div>
-    </section>
-    <section class="landed" id="landed">
-      <p class="quote">Coffee will take it from here.</p>
-      <div class="actions">
-        <button class="btn primary" id="done">Done</button>
-        <button class="btn ghost" id="again">One more</button>
-      </div>
-    </section>
-    <section class="locked" id="locked">
-      <p class="quote">Not yet. This is for coffee.</p>
-      <div class="actions">
-        <button class="btn primary" id="backLater">Back to the table</button>
-      </div>
-    </section>
-    <section class="list" id="list">
-      <p class="quote" id="listTitle">In the mug</p>
-      <div class="cards" id="cards"></div>
-      <div class="actions">
-        <button class="btn ghost" id="closeList">Back to the table</button>
-      </div>
-    </section>
-    <section class="settings" id="settings">
-      <h2>The mug’s clock</h2>
-      <div class="row">
-        <label for="wake">Thoughts open at</label>
-        <input id="wake" type="time" />
-      </div>
-      <label class="check"><input type="checkbox" id="haptics" checked /> Haptics when the ball lands</label>
-      <div class="actions" style="margin-top:22px">
-        <button class="btn primary" id="saveSet">Save</button>
-        <button class="btn ghost" id="clearAll">Clear mug</button>
-      </div>
-    </section>
+    <div class="settings" id="settings">
+      <p>Coffee time</p>
+      <input id="wake" type="time" />
+      <button id="saveSet">Alright</button>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>
