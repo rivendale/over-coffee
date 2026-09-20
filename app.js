@@ -1,19 +1,13 @@
-const KEY = "over-coffee-v5";
+const KEY = "over-coffee-v6";
 const $ = (id) => document.getElementById(id);
 const R = 18;
-const G = 0.42;
-const DRAG = 0.992;
-const FLOOR = 0.86;
 
 function load() {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || localStorage.getItem("over-coffee-v4") || "{}");
-    return {
-      miss: raw.miss === "easy" ? "easy" : "pickup",
-      sound: raw.sound === true
-    };
+    const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
+    return { sound: raw.sound === true };
   } catch {
-    return { miss: "pickup", sound: false };
+    return { sound: false };
   }
 }
 function save() { localStorage.setItem(KEY, JSON.stringify(store)); }
@@ -26,14 +20,10 @@ const state = {
   phase: "write",
   strokes: [],
   drawing: false,
-  crumple: 0,
-  squeezing: false,
   ball: null,
-  drag: null,
-  origin: null,
-  hist: [],
+  nest: null,
+  dragging: false,
   splash: 0,
-  dim: 0,
   steam: [],
   lastTap: 0
 };
@@ -54,22 +44,25 @@ requestAnimationFrame(resize);
 window.addEventListener("resize", resize);
 window.addEventListener("load", resize);
 
-const mug = () => ({ x: W * 0.5, y: H * 0.36, r: Math.min(W * 0.26, 118) });
+const mug = () => ({ x: W * 0.5, y: H * 0.34, r: Math.min(W * 0.26, 118) });
 function paperBox() {
   const w = Math.min(W * 0.7, 268);
-  const h = w * 0.7;
+  const h = w * 0.62;
   return { x: (W - w) / 2, y: H * 0.58, w, h };
 }
-function opening() {
+function nest() {
+  return { x: W * 0.5, y: H * 0.78 };
+}
+function cup() {
   const m = mug();
-  return { x: m.x, y: m.y - m.r * 0.28, rx: m.r * 0.52, ry: m.r * 0.18 };
+  return { x: m.x, y: m.y - m.r * 0.22 };
 }
 function hasInk() { return state.strokes.some((s) => s.length > 2); }
 function showWrap(on) { $("wrap").classList.toggle("hide", !on); }
 
-state.steam = Array.from({ length: 16 }, (_, i) => ({
+state.steam = Array.from({ length: 14 }, (_, i) => ({
   p: Math.random(), x: (Math.random() - 0.5) * 36,
-  s: 0.0016 + Math.random() * 0.0018, wiggle: i
+  s: 0.0018 + Math.random() * 0.0016, wiggle: i
 }));
 
 let audioCtx;
@@ -88,16 +81,13 @@ function tone(freq, dur, type, gain) {
     o.start(t); o.stop(t + dur);
   } catch {}
 }
-function crunch() { if (!store.sound) return; tone(180, 0.08, "triangle", 0.03); }
-function clink() { if (!store.sound) return; tone(620, 0.1, "sine", 0.03); }
 
 function drawRoom() {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#2b1a12"); g.addColorStop(0.45, "#1a100c"); g.addColorStop(1, "#0e0806");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  const lamp = ctx.createRadialGradient(W * 0.5, H * 0.24, 8, W * 0.5, H * 0.3, H * 0.58);
+  const lamp = ctx.createRadialGradient(W * 0.5, H * 0.22, 8, W * 0.5, H * 0.28, H * 0.55);
   lamp.addColorStop(0, "rgba(232,161,90,0.28)");
-  lamp.addColorStop(0.45, "rgba(232,161,90,0.07)");
   lamp.addColorStop(1, "rgba(232,161,90,0)");
   ctx.fillStyle = lamp; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#3d2619";
@@ -107,11 +97,11 @@ function drawSteam(x, y) {
   ctx.save(); ctx.globalCompositeOperation = "lighter";
   state.steam.forEach((s) => {
     s.p += s.s; if (s.p > 1) s.p = 0;
-    const yy = y - s.p * 110;
+    const yy = y - s.p * 100;
     const xx = x + s.x + Math.sin(s.p * 7 + s.wiggle) * 12;
     ctx.strokeStyle = `rgba(243,214,170,${(1 - s.p) * 0.28})`;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath(); ctx.moveTo(xx, yy + 18); ctx.quadraticCurveTo(xx + 10, yy + 8, xx, yy); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(xx, yy + 16); ctx.quadraticCurveTo(xx + 8, yy + 8, xx, yy); ctx.stroke();
   });
   ctx.restore();
 }
@@ -123,10 +113,8 @@ function drawMug() {
   ctx.beginPath(); ctx.ellipse(8, rh * 0.78, rw * 0.95, rh * 0.24, 0, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = "#efe6d6"; ctx.lineWidth = 14;
   ctx.beginPath(); ctx.arc(rw * 0.86, 10, rw * 0.28, -0.75, 0.95); ctx.stroke();
-  ctx.strokeStyle = "#c9b496"; ctx.lineWidth = 6;
-  ctx.beginPath(); ctx.arc(rw * 0.86, 10, rw * 0.28, -0.75, 0.95); ctx.stroke();
   const body = ctx.createLinearGradient(-rw, -rh, rw, rh);
-  body.addColorStop(0, "#f8f0e4"); body.addColorStop(0.55, "#e4d2b8"); body.addColorStop(1, "#b89a76");
+  body.addColorStop(0, "#f8f0e4"); body.addColorStop(1, "#b89a76");
   ctx.fillStyle = body;
   ctx.beginPath();
   ctx.moveTo(-rw, -rh * 0.1);
@@ -137,22 +125,20 @@ function drawMug() {
   ctx.closePath(); ctx.fill();
   ctx.fillStyle = "#24150f";
   ctx.beginPath(); ctx.ellipse(0, -rh * 0.3, rw * 0.8, rh * 0.3, 0, 0, Math.PI * 2); ctx.fill();
-  const coffee = ctx.createRadialGradient(-12, -rh * 0.36, 6, 0, -rh * 0.26, rw * 0.72);
-  coffee.addColorStop(0, "#6a4228"); coffee.addColorStop(0.5, "#2c1810"); coffee.addColorStop(1, "#140c08");
-  ctx.fillStyle = coffee;
+  ctx.fillStyle = "#2c1810";
   ctx.beginPath(); ctx.ellipse(0, -rh * 0.26, rw * 0.72, rh * 0.24, 0, 0, Math.PI * 2); ctx.fill();
   if (state.splash > 0) {
-    ctx.fillStyle = `rgba(90,56,36,${state.splash * 0.5})`;
-    ctx.beginPath(); ctx.ellipse(0, -rh * 0.22, 34 + (1 - state.splash) * 26, 12, 0, 0, Math.PI * 2); ctx.fill();
-    state.splash -= 0.018;
+    ctx.fillStyle = `rgba(90,56,36,${state.splash * 0.55})`;
+    ctx.beginPath(); ctx.ellipse(0, -rh * 0.22, 30 + (1 - state.splash) * 20, 10, 0, 0, Math.PI * 2); ctx.fill();
+    state.splash -= 0.06;
   }
   ctx.restore();
   drawSteam(m.x, m.y - rh * 0.62);
 }
-function drawInk(box, alpha) {
+function drawInk(box) {
   ctx.save();
   ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
-  ctx.strokeStyle = `rgba(43,28,20,${alpha})`;
+  ctx.strokeStyle = "rgba(43,28,20,0.8)";
   ctx.lineWidth = 4.2; ctx.lineCap = "round"; ctx.lineJoin = "round";
   state.strokes.forEach((s) => {
     if (s.length < 2) return;
@@ -163,58 +149,34 @@ function drawInk(box, alpha) {
   });
   ctx.restore();
 }
-function drawPaperFlat() {
+function drawPaper() {
   const b = paperBox();
-  ctx.save();
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
-  ctx.beginPath(); ctx.ellipse(b.x + b.w / 2, b.y + b.h + 8, b.w * 0.42, 10, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = "#efe6d4";
   ctx.beginPath();
   ctx.moveTo(b.x + 6, b.y); ctx.lineTo(b.x + b.w, b.y + 4);
   ctx.lineTo(b.x + b.w - 8, b.y + b.h); ctx.lineTo(b.x, b.y + b.h - 6);
   ctx.closePath(); ctx.fill();
   ctx.fillStyle = "rgba(43,28,20,0.06)";
-  for (let i = 1; i < 5; i++) ctx.fillRect(b.x + 16, b.y + 18 + i * 22, b.w - 36, 1);
-  drawInk(b, 0.78);
-  ctx.restore();
-}
-function drawCrumpling() {
-  const t = state.crumple;
-  const b = paperBox();
-  const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-  const w = b.w * (1 - t * 0.78), h = b.h * (1 - t * 0.78);
-  ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 0.7);
-  ctx.fillStyle = "#efe6d4";
-  ctx.beginPath();
-  ctx.moveTo(-w / 2, -h / 2 + 6 * t);
-  ctx.quadraticCurveTo(0, -h / 2 - 10 * t, w / 2, -h / 2 + 4 * t);
-  ctx.lineTo(w / 2 - 8 * t, h / 2);
-  ctx.quadraticCurveTo(0, h / 2 + 12 * t, -w / 2 + 6 * t, h / 2 - 4 * t);
-  ctx.closePath(); ctx.fill();
-  if (t < 0.7) drawInk({ x: cx - w / 2, y: cy - h / 2, w, h }, 0.55 * (1 - t));
-  ctx.restore();
+  for (let i = 1; i < 5; i++) ctx.fillRect(b.x + 16, b.y + 16 + i * 20, b.w - 36, 1);
+  drawInk(b);
 }
 function drawBall(b) {
-  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.spin || 0);
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
-  ctx.beginPath(); ctx.ellipse(2, 16, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.translate(b.x, b.y);
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath(); ctx.ellipse(2, 16, 15, 6, 0, 0, Math.PI * 2); ctx.fill();
   const g = ctx.createRadialGradient(-6, -7, 2, 0, 0, R);
-  g.addColorStop(0, "#f7f1e6"); g.addColorStop(0.65, "#e2d3ba"); g.addColorStop(1, "#b89a74");
+  g.addColorStop(0, "#f7f1e6"); g.addColorStop(1, "#b89a74");
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "rgba(90,70,50,0.4)"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-8, -6); ctx.quadraticCurveTo(2, -2, 10, -8);
-  ctx.moveTo(-10, 4); ctx.quadraticCurveTo(0, 8, 9, 2); ctx.stroke();
   ctx.restore();
 }
-function drawAim() {
-  if (!state.drag || !state.ball || !state.origin) return;
-  const o = state.origin, b = state.ball;
+function drawBand() {
+  if (!state.dragging || !state.ball || !state.nest) return;
+  const n = state.nest, b = state.ball, c = cup();
   ctx.save();
-  ctx.strokeStyle = "rgba(243,230,208,0.28)";
-  ctx.setLineDash([5, 6]); ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(b.x, b.y);
-  ctx.lineTo(o.x + (o.x - b.x), o.y + (o.y - b.y));
-  ctx.stroke();
+  ctx.strokeStyle = "rgba(232,161,90,0.55)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(n.x - 16, n.y); ctx.lineTo(b.x, b.y); ctx.lineTo(n.x + 16, n.y); ctx.stroke();
+  ctx.setLineDash([4, 5]); ctx.strokeStyle = "rgba(243,230,208,0.35)";
+  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.quadraticCurveTo(n.x, (b.y + c.y) / 2, c.x, c.y); ctx.stroke();
   ctx.restore();
 }
 
@@ -227,105 +189,55 @@ function toUV(p) {
   return { u: (p.x - b.x) / b.w, v: (p.y - b.y) / b.h };
 }
 function hitBall(p) {
-  if (!state.ball) return false;
-  return Math.hypot(p.x - state.ball.x, p.y - state.ball.y) < R + 22;
+  return state.ball && Math.hypot(p.x - state.ball.x, p.y - state.ball.y) < R + 28;
 }
 function pt(e) {
   const r = canvas.getBoundingClientRect();
   const s = e.touches ? e.touches[0] : e;
   return { x: s.clientX - r.left, y: s.clientY - r.top };
 }
-function inOpening(x, y) {
-  const o = opening();
-  const dx = (x - o.x) / o.rx, dy = (y - o.y) / o.ry;
-  return dx * dx + dy * dy <= 1;
-}
 
-function startWrap() {
+function wrapNow() {
   if (state.phase !== "write") return;
-  state.phase = "crumple";
-  state.crumple = 0;
-  state.squeezing = true;
-  showWrap(false);
-  crunch();
-}
-function readyBall() {
-  const b = paperBox();
-  state.ball = { x: b.x + b.w / 2, y: b.y + b.h / 2, vx: 0, vy: 0, spin: 0, rest: 0 };
+  const n = nest();
+  state.nest = n;
+  state.ball = { x: n.x, y: n.y, t: 0 };
   state.phase = "hold";
-  state.squeezing = false;
+  showWrap(false);
+}
+function fire() {
+  const b = state.ball, n = state.nest;
+  if (!b || !n) return;
+  const pull = Math.hypot(n.x - b.x, n.y - b.y);
+  if (pull < 16) { b.x = n.x; b.y = n.y; state.phase = "hold"; return; }
+  const c = cup();
+  b.from = { x: b.x, y: b.y };
+  b.to = { x: c.x, y: c.y };
+  b.mid = { x: (b.x + c.x) / 2, y: Math.min(b.y, c.y) - 40 - pull * 0.15 };
+  b.t = 0;
+  state.phase = "flight";
+  state.dragging = false;
 }
 function land() {
-  if (state.phase === "rest") return;
   state.phase = "rest";
   state.splash = 1;
   state.ball = null;
-  clink();
-  state.dim = 0.01;
-  setTimeout(resetTable, 1800);
-}
-function resetTable() {
-  state.phase = "write";
-  state.strokes = [];
-  state.ball = null;
-  state.dim = 0;
-  showWrap(false);
-}
-
-function bounceFloor(b) {
-  const yFloor = H * FLOOR;
-  if (b.y + R < yFloor) return false;
-  b.y = yFloor - R;
-  b.vy *= -0.38;
-  b.vx *= 0.72;
-  b.spin *= 0.7;
-  if (Math.abs(b.vy) < 1.4 && Math.abs(b.vx) < 1.1) {
-    b.vx = 0; b.vy = 0;
-    return true;
-  }
-  return false;
-}
-function bounceMug(b) {
-  const m = mug();
-  const dx = b.x - m.x, dy = b.y - m.y;
-  const dist = Math.hypot(dx, dy);
-  const body = m.r * 0.78;
-  if (dist > body + R || dist < 1) return;
-  if (inOpening(b.x, b.y) && b.vy > 0.4) return;
-  const nx = dx / dist, ny = dy / dist;
-  const dot = b.vx * nx + b.vy * ny;
-  if (dot >= 0) return;
-  b.vx -= 1.6 * dot * nx;
-  b.vy -= 1.6 * dot * ny;
-  b.x = m.x + nx * (body + R + 1);
-  b.y = m.y + ny * (body + R + 1);
-  b.spin += -b.vx * 0.04;
+  if (store.sound) tone(620, 0.08, "sine", 0.03);
+  setTimeout(() => {
+    state.phase = "write";
+    state.strokes = [];
+    showWrap(false);
+  }, 350);
 }
 function stepFlight() {
   const b = state.ball; if (!b) return;
-  b.vy += G;
-  b.vx *= DRAG; b.vy *= DRAG;
-  b.x += b.vx; b.y += b.vy;
-  b.spin += b.vx * 0.03;
-  if (inOpening(b.x, b.y) && b.vy > 0.6) { land(); return; }
-  bounceMug(b);
-  const settled = bounceFloor(b);
-  if (b.x < R) { b.x = R; b.vx = Math.abs(b.vx) * 0.5; }
-  if (b.x > W - R) { b.x = W - R; b.vx = -Math.abs(b.vx) * 0.5; }
-  if (settled) {
-    if (store.miss === "easy") state.phase = "home";
-    else state.phase = "hold";
-  }
-}
-function stepHome() {
-  const b = state.ball; if (!b) return;
-  const o = opening();
-  b.vx += (o.x - b.x) * 0.012;
-  b.vy += (o.y - b.y) * 0.012 - 0.08;
-  b.vx *= 0.9; b.vy *= 0.9;
-  b.x += b.vx; b.y += b.vy;
-  b.spin += 0.08;
-  if (inOpening(b.x, b.y)) land();
+  b.t = Math.min(1, b.t + 0.09);
+  const u = b.t * b.t * (3 - 2 * b.t);
+  const a = b.from, m = b.mid, c = b.to;
+  const o = 1 - u;
+  b.x = o * o * a.x + 2 * o * u * m.x + u * u * c.x;
+  b.y = o * o * a.y + 2 * o * u * m.y + u * u * c.y;
+  if (b.t >= 1) land();
 }
 
 canvas.addEventListener("pointerdown", (e) => {
@@ -333,22 +245,15 @@ canvas.addEventListener("pointerdown", (e) => {
   canvas.setPointerCapture(e.pointerId);
   if (state.phase === "write" && onPaper(p)) {
     const now = performance.now();
-    if (now - state.lastTap < 340 && hasInk()) { startWrap(); state.lastTap = 0; return; }
+    if (now - state.lastTap < 300 && hasInk()) { wrapNow(); return; }
     state.lastTap = now;
     state.drawing = true;
     state.strokes.push([toUV(p)]);
     return;
   }
-  if (state.phase === "crumple") {
-    state.squeezing = true;
-    return;
-  }
   if ((state.phase === "hold" || state.phase === "flight") && hitBall(p)) {
-    state.phase = "throw";
-    state.drag = true;
-    state.origin = { x: state.ball.x, y: state.ball.y };
-    state.hist = [{ ...p, t: performance.now() }];
-    state.ball.vx = 0; state.ball.vy = 0;
+    state.phase = "hold";
+    state.dragging = true;
   }
 });
 canvas.addEventListener("pointermove", (e) => {
@@ -358,90 +263,42 @@ canvas.addEventListener("pointermove", (e) => {
     if (hasInk()) showWrap(true);
     return;
   }
-  if (state.phase === "crumple" && state.squeezing) {
-    const b = paperBox();
-    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    const max = Math.hypot(b.w, b.h) * 0.45;
-    const d = Math.min(max, Math.hypot(p.x - cx, p.y - cy));
-    state.crumple = Math.max(state.crumple, 1 - d / max);
-    return;
-  }
-  if (state.drag && state.ball) {
-    state.ball.x = p.x; state.ball.y = p.y;
-    state.hist.push({ ...p, t: performance.now() });
-    if (state.hist.length > 8) state.hist.shift();
+  if (state.dragging && state.ball && state.nest) {
+    const n = state.nest;
+    let x = p.x, y = p.y;
+    y = Math.max(n.y - 20, Math.min(H - 30, y));
+    const dx = x - n.x, dy = y - n.y;
+    const d = Math.hypot(dx, dy);
+    const max = 130;
+    if (d > max) { x = n.x + dx / d * max; y = n.y + dy / d * max; }
+    state.ball.x = x; state.ball.y = y;
   }
 });
-function release() {
-  if (state.phase === "crumple") {
-    state.squeezing = false;
-    if (state.crumple > 0.86) readyBall();
-    return;
-  }
+function up() {
   state.drawing = false;
   if (state.phase === "write" && hasInk()) showWrap(true);
-  if (!state.drag || !state.ball) { state.drag = false; return; }
-  state.drag = false;
-  const o = state.origin || state.ball;
-  const pullX = o.x - state.ball.x;
-  const pullY = o.y - state.ball.y;
-  const pull = Math.hypot(pullX, pullY);
-  let vx = 0, vy = 0;
-  if (pull > 18) {
-    vx = pullX * 0.14;
-    vy = pullY * 0.14;
-  } else if (state.hist.length >= 2) {
-    const a = state.hist[0], b = state.hist[state.hist.length - 1];
-    const dt = Math.max(16, b.t - a.t);
-    vx = (b.x - a.x) / dt * 16;
-    vy = (b.y - a.y) / dt * 16;
-  }
-  vx = Math.max(-20, Math.min(20, vx));
-  vy = Math.max(-22, Math.min(14, vy));
-  if (Math.hypot(vx, vy) < 2.4) { state.phase = "hold"; return; }
-  state.ball.vx = vx;
-  state.ball.vy = vy;
-  state.ball.spin = -vx * 0.05;
-  state.origin = null;
-  state.phase = "flight";
+  if (state.dragging) fire();
+  state.dragging = false;
 }
-canvas.addEventListener("pointerup", release);
-canvas.addEventListener("pointercancel", release);
+canvas.addEventListener("pointerup", up);
+canvas.addEventListener("pointercancel", up);
 
-function paintSettings() {
-  $("modePickup").classList.toggle("on", store.miss === "pickup");
-  $("modeEasy").classList.toggle("on", store.miss === "easy");
+$("wrap").addEventListener("click", wrapNow);
+$("mark").addEventListener("click", () => {
   $("soundOff").classList.toggle("on", !store.sound);
   $("soundOn").classList.toggle("on", store.sound);
-}
-$("wrap").addEventListener("click", startWrap);
-$("mark").addEventListener("click", () => { paintSettings(); $("settings").classList.toggle("open"); });
-$("modePickup").addEventListener("click", () => { store.miss = "pickup"; save(); paintSettings(); });
-$("modeEasy").addEventListener("click", () => { store.miss = "easy"; save(); paintSettings(); });
-$("soundOff").addEventListener("click", () => { store.sound = false; save(); paintSettings(); });
-$("soundOn").addEventListener("click", () => { store.sound = true; save(); paintSettings(); });
+  $("settings").classList.toggle("open");
+});
+$("soundOff").addEventListener("click", () => { store.sound = false; save(); $("soundOff").classList.add("on"); $("soundOn").classList.remove("on"); });
+$("soundOn").addEventListener("click", () => { store.sound = true; save(); $("soundOn").classList.add("on"); $("soundOff").classList.remove("on"); });
 $("saveSet").addEventListener("click", () => $("settings").classList.remove("open"));
 
 function loop() {
   drawRoom(); drawMug();
-  if (state.phase === "write") drawPaperFlat();
-  else if (state.phase === "crumple") {
-    if (!state.squeezing) state.crumple = Math.min(1, state.crumple + 0.012);
-    drawCrumpling();
-    if (state.crumple >= 1) readyBall();
-  }
-  if (state.ball && state.phase !== "rest") {
+  if (state.phase === "write") drawPaper();
+  if (state.ball) {
     if (state.phase === "flight") stepFlight();
-    if (state.phase === "home") stepHome();
-    if (state.ball) {
-      drawBall(state.ball);
-      drawAim();
-    }
-  }
-  if (state.dim > 0) {
-    ctx.fillStyle = `rgba(10,6,4,${Math.min(0.32, state.dim)})`;
-    ctx.fillRect(0, 0, W, H);
-    state.dim += 0.01;
+    if (state.ball) { drawBand(); drawBall(state.ball); }
   }
   requestAnimationFrame(loop);
 }
