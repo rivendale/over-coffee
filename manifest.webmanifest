@@ -1,0 +1,18 @@
+{
+  "name": "Over Coffee",
+  "short_name": "Over Coffee",
+  "description": "Crumple a thought, toss it in the mug, deal with it in the morning.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1A100C",
+  "theme_color": "#1A100C",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
