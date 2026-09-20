@@ -7,29 +7,36 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Over Coffee" />
-  <meta name="description" content="Crumple it. Toss it. Coffee holds it." />
+  <meta name="description" content="Write it on the scrap. Wrap it. Fling it." />
   <title>Over Coffee</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,420;0,9..144,560;1,9..144,420&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="app.css?v=3" />
+  <link rel="stylesheet" href="app.css?v=4" />
 </head>
 <body>
   <div id="app">
     <canvas id="scene"></canvas>
     <p class="mark" id="mark">Over Coffee</p>
     <p class="whisper" id="whisper"></p>
-    <div class="line" id="line">
-      <input id="thought" type="text" maxlength="120" placeholder="name it once" autocomplete="off" enterkeyhint="done" />
-    </div>
+    <button class="wrap" id="wrap" aria-label="Wrap into a ball">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+        <path d="M7 4h10l-1.5 5H8.5L7 4z"/>
+        <path d="M8.5 9l-1 4h9l-1-4"/>
+        <circle cx="12" cy="17.5" r="3.2"/>
+      </svg>
+    </button>
     <div class="settings" id="settings">
-      <p>Coffee time</p>
-      <input id="wake" type="time" />
-      <button id="saveSet">Alright</button>
+      <p>If you miss</p>
+      <div class="picks">
+        <button id="modePickup" type="button">Pick it up</button>
+        <button id="modeEasy" type="button">Cup catches</button>
+      </div>
+      <button class="ok" id="saveSet" type="button">Alright</button>
     </div>
   </div>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
