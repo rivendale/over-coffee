@@ -18,55 +18,57 @@ html, body {
 }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .mark {
-  position: absolute; top: calc(14px + var(--safe-top)); left: 0; right: 0;
+  position: absolute; top: calc(10px + var(--safe-top)); left: 0; right: 0;
   text-align: center; margin: 0; z-index: 3;
-  font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase;
-  color: rgba(243,230,208,0.38); font-weight: 420;
+  font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: rgba(243,230,208,0.34); font-weight: 420;
 }
+.rooms {
+  position: absolute; z-index: 4;
+  top: calc(34px + var(--safe-top)); left: 0; right: 0;
+  display: flex; justify-content: center; gap: 10px;
+}
+.rooms button {
+  width: 14px; height: 14px; border-radius: 50%; border: 0; cursor: pointer;
+  padding: 0; opacity: 0.55;
+}
+.rooms button.on { opacity: 1; outline: 2px solid rgba(243,230,208,0.7); outline-offset: 3px; }
+.rooms button[data-scene="lamp"] { background: #c4844a; }
+.rooms button[data-scene="japan"] { background: #6b7fa8; }
+.rooms button[data-scene="country"] { background: #d08a4a; }
+.rooms button[data-scene="shore"] { background: #7eb3c9; }
+.rooms button[data-scene="garden"] { background: #8a6b7a; }
 .kit {
   position: absolute; z-index: 4;
   left: 16px; right: 16px;
-  bottom: calc(78px + var(--safe-bot));
-  display: flex; gap: 8px; justify-content: center;
+  bottom: calc(22px + var(--safe-bot));
+  display: flex; gap: 12px; justify-content: center; align-items: center;
 }
 .kit.away { opacity: 0; pointer-events: none; }
 .tool {
-  border: 0; cursor: pointer; flex: 1; max-width: 88px;
-  border-radius: 999px; padding: 10px 6px;
-  font: italic 420 13px/1 "Fraunces", Georgia, serif;
-  background: rgba(243,230,208,0.1); color: rgba(243,230,208,0.75);
+  width: 22px; height: 22px; border-radius: 50%; border: 0; cursor: pointer; padding: 0;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.2);
 }
-.tool.on { background: rgba(232,161,90,0.92); color: #2b1c14; }
+.tool[data-tool="pencil"] { background: #3c2a1e; }
+.tool[data-tool="pen"] { background: #1c2446; }
+.tool[data-tool="crayon"] { background: #b03e30; }
+.tool[data-tool="marker"] { background: #285c4a; }
+.tool.on { box-shadow: 0 0 0 3px #f3e6d0; }
 .wrap {
-  position: absolute; z-index: 4;
-  left: 50%; bottom: calc(18px + var(--safe-bot));
-  transform: translateX(-50%);
-  border: 0; cursor: pointer;
-  background: rgba(232,161,90,0.92); color: #2b1c14;
-  border-radius: 999px; padding: 12px 22px;
-  font: italic 420 16px/1 "Fraunces", Georgia, serif;
+  border: 0; cursor: pointer; margin-left: 8px;
+  background: rgba(232,161,90,0.95); color: #2b1c14;
+  border-radius: 999px; padding: 10px 16px;
+  font: italic 420 15px/1 "Fraunces", Georgia, serif;
 }
-.wrap.hide { opacity: 0; pointer-events: none; }
+.wrap.hide { opacity: 0; pointer-events: none; width: 0; padding: 0; margin: 0; }
 .settings {
-  position: absolute; left: 18px; right: 18px;
-  bottom: calc(88px + var(--safe-bot));
+  position: absolute; left: 22px; right: 22px;
+  bottom: calc(80px + var(--safe-bot));
   z-index: 5; display: none; text-align: center;
   background: rgba(18,10,7,0.94); border-radius: 22px; padding: 18px 14px;
 }
 .settings.open { display: block; }
-.settings p { margin: 12px 0 8px; font-style: italic; color: var(--lamp); font-size: 15px; }
-.settings p:first-child { margin-top: 0; }
-.scenes {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-}
-.scenes button {
-  border: 0; border-radius: 14px; cursor: pointer;
-  padding: 12px 8px;
-  font: italic 420 15px/1 "Fraunces", Georgia, serif;
-  background: rgba(243,230,208,0.08); color: var(--cream);
-}
-.scenes button:last-child { grid-column: 1 / -1; }
-.scenes button.on { background: var(--lamp); color: var(--ink); }
+.settings p { margin: 0 0 8px; font-style: italic; color: var(--lamp); }
 .picks { display: flex; gap: 8px; }
 .picks button, .ok {
   flex: 1; border: 0; border-radius: 999px; cursor: pointer;
@@ -75,6 +77,4 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   background: rgba(243,230,208,0.08); color: var(--cream);
 }
 .picks button.on { background: var(--lamp); color: var(--ink); }
-.ok {
-  margin-top: 16px; width: 100%; background: rgba(243,230,208,0.14); color: var(--cream);
-}
+.ok { margin-top: 14px; width: 100%; background: rgba(243,230,208,0.14); color: var(--cream); }
