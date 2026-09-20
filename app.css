@@ -18,38 +18,39 @@ html, body {
 }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .mark {
-  position: absolute; top: calc(16px + var(--safe-top)); left: 0; right: 0;
+  position: absolute; top: calc(14px + var(--safe-top)); left: 0; right: 0;
   text-align: center; margin: 0; z-index: 3;
-  font-size: 15px; letter-spacing: 0.18em; text-transform: uppercase;
-  color: rgba(243,230,208,0.38); font-weight: 420;
+  font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: rgba(243,230,208,0.28); font-weight: 420;
 }
 .whisper {
-  position: absolute; left: 24px; right: 24px; top: 18%;
+  position: absolute; left: 24px; right: 24px; top: 16%;
   text-align: center; z-index: 3; margin: 0;
-  font-size: 20px; font-style: italic; font-weight: 420;
-  color: rgba(243,230,208,0.72); opacity: 0; pointer-events: none;
+  font-size: 18px; font-style: italic; font-weight: 420;
+  color: rgba(243,230,208,0.55); opacity: 0; pointer-events: none;
   transition: opacity 0.7s ease;
 }
 .whisper.on { opacity: 1; }
 .wrap {
   position: absolute; z-index: 4;
-  right: 22px; bottom: calc(28px + var(--safe-bot));
-  width: 64px; height: 64px; border-radius: 50%;
+  left: 50%; bottom: calc(22px + var(--safe-bot));
+  transform: translateX(-50%);
   border: 0; cursor: pointer;
-  background: #e8a15a; color: #2b1c14;
-  display: grid; place-items: center;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  background: rgba(232,161,90,0.92); color: #2b1c14;
+  border-radius: 999px; padding: 12px 22px;
+  font: italic 420 16px/1 "Fraunces", Georgia, serif;
   transition: opacity 0.3s, transform 0.3s;
 }
-.wrap.hide { opacity: 0; transform: scale(0.8); pointer-events: none; }
+.wrap.hide { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(8px); }
 .settings {
   position: absolute; left: 22px; right: 22px;
-  bottom: calc(110px + var(--safe-bot));
+  bottom: calc(88px + var(--safe-bot));
   z-index: 5; display: none; text-align: center;
-  background: rgba(18,10,7,0.92); border-radius: 22px; padding: 22px 16px;
+  background: rgba(18,10,7,0.94); border-radius: 22px; padding: 20px 16px;
 }
 .settings.open { display: block; }
-.settings p { margin: 0 0 12px; font-style: italic; color: var(--lamp); }
+.settings p { margin: 14px 0 8px; font-style: italic; color: var(--lamp); font-size: 15px; }
+.settings p:first-child { margin-top: 0; }
 .picks { display: flex; gap: 8px; }
 .picks button, .ok {
   flex: 1; border: 0; border-radius: 999px; cursor: pointer;
@@ -59,5 +60,5 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 }
 .picks button.on { background: var(--lamp); color: var(--ink); }
 .ok {
-  margin-top: 14px; width: 100%; background: var(--lamp); color: var(--ink);
+  margin-top: 16px; width: 100%; background: rgba(243,230,208,0.14); color: var(--cream);
 }
