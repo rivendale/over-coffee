@@ -1,12 +1,15 @@
-const KEY = "over-coffee-v3";
+const KEY = "over-coffee-v4";
 const $ = (id) => document.getElementById(id);
 
 function load() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
-    return { miss: raw.miss === "easy" ? "easy" : "pickup" };
+    return {
+      miss: raw.miss === "pickup" ? "pickup" : "easy",
+      sound: raw.sound === true
+    };
   } catch {
-    return { miss: "pickup" };
+    return { miss: "easy", sound: false };
   }
 }
 function save() { localStorage.setItem(KEY, JSON.stringify(store)); }
@@ -25,7 +28,8 @@ const state = {
   hist: [],
   splash: 0,
   dim: 0,
-  steam: []
+  steam: [],
+  lastTap: 0
 };
 
 function resize() {
@@ -50,6 +54,12 @@ function paperBox() {
   const h = w * 0.7;
   return { x: (W - w) / 2, y: H * 0.58, w, h };
 }
+function hasInk() {
+  return state.strokes.some((s) => s.length > 2);
+}
+function showWrap(on) {
+  $("wrap").classList.toggle("hide", !on);
+}
 
 state.steam = Array.from({ length: 16 }, (_, i) => ({
   p: Math.random(), x: (Math.random() - 0.5) * 36,
@@ -58,8 +68,10 @@ state.steam = Array.from({ length: 16 }, (_, i) => ({
 
 let audioCtx;
 function tone(freq, dur, type, gain) {
+  if (!store.sound) return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
     const t = audioCtx.currentTime;
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
@@ -71,16 +83,16 @@ function tone(freq, dur, type, gain) {
   } catch {}
 }
 function crunch() {
+  if (!store.sound) return;
   tone(180, 0.08, "triangle", 0.03);
   setTimeout(() => tone(140, 0.1, "square", 0.018), 50);
-  if (navigator.vibrate) navigator.vibrate(10);
 }
 function clink() {
+  if (!store.sound) return;
   tone(620, 0.12, "sine", 0.04);
   setTimeout(() => tone(880, 0.08, "sine", 0.02), 40);
-  if (navigator.vibrate) navigator.vibrate(16);
 }
-function whisper(text, ms = 1800) {
+function whisper(text, ms = 1400) {
   const el = $("whisper");
   el.textContent = text;
   el.classList.add("on");
@@ -159,7 +171,7 @@ function drawInk(box, alpha) {
   ctx.rect(box.x, box.y, box.w, box.h);
   ctx.clip();
   ctx.strokeStyle = `rgba(43,28,20,${alpha})`;
-  ctx.lineWidth = 2.6;
+  ctx.lineWidth = 4.2;
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   state.strokes.forEach((s) => {
     if (s.length < 2) return;
@@ -189,7 +201,7 @@ function drawPaperFlat() {
   for (let i = 1; i < 5; i++) {
     ctx.fillRect(b.x + 16, b.y + 18 + i * 22, b.w - 36, 1);
   }
-  drawInk(b, 0.72);
+  drawInk(b, 0.78);
   ctx.restore();
 }
 
@@ -210,16 +222,14 @@ function drawCrumpling() {
   ctx.lineTo(w / 2 - 8 * t, h / 2);
   ctx.quadraticCurveTo(0, h / 2 + 12 * t, -w / 2 + 6 * t, h / 2 - 4 * t);
   ctx.closePath(); ctx.fill();
-  if (t < 0.7) {
-    drawInk({ x: cx - w / 2, y: cy - h / 2, w, h }, 0.55 * (1 - t));
-  }
+  if (t < 0.7) drawInk({ x: cx - w / 2, y: cy - h / 2, w, h }, 0.55 * (1 - t));
   ctx.restore();
 }
 
 function drawBall(x, y) {
   ctx.save(); ctx.translate(x, y);
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath(); ctx.ellipse(3, 16, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.beginPath(); ctx.ellipse(2, 18, 18, 7, 0, 0, Math.PI * 2); ctx.fill();
   const g = ctx.createRadialGradient(-6, -7, 2, 0, 0, 22);
   g.addColorStop(0, "#f7f1e6"); g.addColorStop(0.65, "#e2d3ba"); g.addColorStop(1, "#b89a74");
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.fill();
@@ -255,7 +265,7 @@ function startWrap() {
   if (state.phase !== "write") return;
   state.phase = "crumple";
   state.crumple = 0;
-  $("wrap").classList.add("hide");
+  showWrap(false);
   crunch();
 }
 
@@ -263,7 +273,6 @@ function readyBall() {
   const b = paperBox();
   state.ball = { x: b.x + b.w / 2, y: b.y + b.h / 2, vx: 0, vy: 0 };
   state.phase = "hold";
-  whisper("fling it", 1400);
 }
 
 function land() {
@@ -272,9 +281,8 @@ function land() {
   state.splash = 1;
   state.ball = null;
   clink();
-  whisper("coffee has it");
   state.dim = 0.01;
-  setTimeout(resetTable, 2400);
+  setTimeout(resetTable, 2000);
 }
 
 function resetTable() {
@@ -282,12 +290,12 @@ function resetTable() {
   state.strokes = [];
   state.ball = null;
   state.dim = 0;
-  $("wrap").classList.remove("hide");
+  showWrap(false);
 }
 
 function missOut() {
   if (store.miss === "easy") {
-  state.phase = "home";
+    state.phase = "home";
     return;
   }
   const b = paperBox();
@@ -296,7 +304,6 @@ function missOut() {
   state.ball.x = Math.max(30, Math.min(W - 30, state.ball.x));
   state.ball.y = Math.min(H * 0.82, Math.max(b.y, state.ball.y));
   state.phase = "hold";
-  whisper("pick it up", 1200);
 }
 
 function stepFlight() {
@@ -307,10 +314,7 @@ function stepFlight() {
   b.vx *= 0.995;
   const rim = mugRim();
   const dist = Math.hypot(rim.x - b.x, rim.y - b.y);
-  if (dist < rim.r + 8 && b.vy > -1) {
-    land();
-    return;
-  }
+  if (dist < rim.r + 8 && b.vy > -1) { land(); return; }
   if (b.y > H * 0.9 || b.x < -30 || b.x > W + 30) missOut();
 }
 
@@ -328,6 +332,13 @@ canvas.addEventListener("pointerdown", (e) => {
   const p = pt(e);
   canvas.setPointerCapture(e.pointerId);
   if (state.phase === "write" && onPaper(p)) {
+    const now = performance.now();
+    if (now - state.lastTap < 320 && hasInk()) {
+      startWrap();
+      state.lastTap = 0;
+      return;
+    }
+    state.lastTap = now;
     state.drawing = true;
     state.strokes.push([toUV(p)]);
     return;
@@ -343,6 +354,7 @@ canvas.addEventListener("pointermove", (e) => {
   const p = pt(e);
   if (state.drawing && state.phase === "write") {
     state.strokes[state.strokes.length - 1].push(toUV(p));
+    if (hasInk()) showWrap(true);
     return;
   }
   if (state.drag && state.ball) {
@@ -353,6 +365,7 @@ canvas.addEventListener("pointermove", (e) => {
 });
 function release() {
   state.drawing = false;
+  if (state.phase === "write" && hasInk()) showWrap(true);
   if (!state.drag || !state.ball) { state.drag = false; return; }
   state.drag = false;
   const hist = state.hist;
@@ -376,20 +389,21 @@ function release() {
 canvas.addEventListener("pointerup", release);
 canvas.addEventListener("pointercancel", release);
 
-$("wrap").addEventListener("click", startWrap);
-$("mark").addEventListener("click", () => {
+function paintSettings() {
   $("modePickup").classList.toggle("on", store.miss === "pickup");
   $("modeEasy").classList.toggle("on", store.miss === "easy");
+  $("soundOff").classList.toggle("on", !store.sound);
+  $("soundOn").classList.toggle("on", store.sound);
+}
+$("wrap").addEventListener("click", startWrap);
+$("mark").addEventListener("click", () => {
+  paintSettings();
   $("settings").classList.toggle("open");
 });
-$("modePickup").addEventListener("click", () => {
-  store.miss = "pickup"; save();
-  $("modePickup").classList.add("on"); $("modeEasy").classList.remove("on");
-});
-$("modeEasy").addEventListener("click", () => {
-  store.miss = "easy"; save();
-  $("modeEasy").classList.add("on"); $("modePickup").classList.remove("on");
-});
+$("modePickup").addEventListener("click", () => { store.miss = "pickup"; save(); paintSettings(); });
+$("modeEasy").addEventListener("click", () => { store.miss = "easy"; save(); paintSettings(); });
+$("soundOff").addEventListener("click", () => { store.sound = false; save(); paintSettings(); });
+$("soundOn").addEventListener("click", () => { store.sound = true; save(); paintSettings(); });
 $("saveSet").addEventListener("click", () => $("settings").classList.remove("open"));
 
 function loop() {
