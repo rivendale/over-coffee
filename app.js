@@ -1,44 +1,36 @@
-const KEY = "over-coffee-v1";
+const KEY = "over-coffee-v2";
 const $ = (id) => document.getElementById(id);
-const state = {
-  mode: "later", phase: "compose", laterCount: 0,
-  thought: "", sip: "", ball: null, dragging: false,
-  drag: { x: 0, y: 0, px: 0, py: 0 }, steam: []
-};
+
 function load() {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const raw = JSON.parse(localStorage.getItem(KEY) || localStorage.getItem("over-coffee-v1") || "{}");
     return {
       wakeHour: raw.wakeHour ?? 6,
       wakeMinute: raw.wakeMinute ?? 30,
-      haptics: raw.haptics !== false,
       thoughts: Array.isArray(raw.thoughts) ? raw.thoughts : []
     };
   } catch {
-    return { wakeHour: 6, wakeMinute: 30, haptics: true, thoughts: [] };
+    return { wakeHour: 6, wakeMinute: 30, thoughts: [] };
   }
 }
-function save(data) { localStorage.setItem(KEY, JSON.stringify(data)); }
+function save() { localStorage.setItem(KEY, JSON.stringify(store)); }
 let store = load();
-function isMorningNow(date = new Date()) {
-  const mins = date.getHours() * 60 + date.getMinutes();
-  const wake = store.wakeHour * 60 + store.wakeMinute;
-  return mins >= wake && mins < wake + 14 * 60;
-}
-function nextOpen(from = new Date()) {
-  const d = new Date(from);
-  d.setHours(store.wakeHour, store.wakeMinute, 0, 0);
-  if (d <= from) d.setDate(d.getDate() + 1);
-  return d.toISOString();
-}
-function buzz(ms = 12) {
-  if (store.haptics && navigator.vibrate) navigator.vibrate(ms);
-}
+
 const canvas = $("scene");
 const ctx = canvas.getContext("2d");
-const ghost = $("ghost");
-let W = 0, H = 0, dpr = 1, splash = 0;
-const scene = { mug: { x: 0.5, y: 0.34 }, home: { x: 0.5, y: 0.72 } };
+let W = 0, H = 0, dpr = 1;
+const state = {
+  phase: "write",
+  thought: "",
+  crumple: 0,
+  ball: null,
+  drag: null,
+  splash: 0,
+  dim: 0,
+  steam: [],
+  scraps: []
+};
+
 function resize() {
   const app = $("app");
   dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -49,246 +41,293 @@ function resize() {
 }
 resize();
 window.addEventListener("resize", resize);
-const mugCenter = () => ({ x: W * scene.mug.x, y: H * scene.mug.y });
-const homePos = () => ({ x: W * scene.home.x, y: H * scene.home.y });
-state.steam = Array.from({ length: 14 }, (_, i) => ({
-  p: Math.random(), x: (Math.random() - 0.5) * 28,
-  s: 0.0018 + Math.random() * 0.0016, delay: i * 0.05
+
+const mug = () => ({ x: W * 0.5, y: H * 0.42, r: Math.min(W * 0.28, 128) });
+const home = () => ({ x: W * 0.5, y: H * 0.72 });
+
+state.steam = Array.from({ length: 16 }, (_, i) => ({
+  p: Math.random(), x: (Math.random() - 0.5) * 36,
+  s: 0.0016 + Math.random() * 0.0018, wiggle: i
 }));
-function drawWood() {
+
+let audioCtx;
+function tone(freq, dur, type, gain) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur);
+  } catch {}
+}
+function crunch() {
+  tone(180, 0.08, "triangle", 0.03);
+  setTimeout(() => tone(140, 0.09, "square", 0.02), 40);
+  setTimeout(() => tone(90, 0.12, "triangle", 0.025), 90);
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+function clink() {
+  tone(620, 0.12, "sine", 0.04);
+  setTimeout(() => tone(880, 0.08, "sine", 0.02), 40);
+  if (navigator.vibrate) navigator.vibrate(16);
+}
+
+function whisper(text, ms = 2200) {
+  const el = $("whisper");
+  el.textContent = text;
+  el.classList.add("on");
+  clearTimeout(whisper._t);
+  whisper._t = setTimeout(() => el.classList.remove("on"), ms);
+}
+
+function drawRoom() {
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#2a1811"); g.addColorStop(0.42, "#1c110c"); g.addColorStop(1, "#120b08");
+  g.addColorStop(0, "#2b1a12");
+  g.addColorStop(0.45, "#1a100c");
+  g.addColorStop(1, "#0e0806");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  const lamp = ctx.createRadialGradient(W * 0.5, H * 0.22, 10, W * 0.5, H * 0.28, H * 0.55);
-  lamp.addColorStop(0, "rgba(232,161,90,0.20)");
-  lamp.addColorStop(0.45, "rgba(232,161,90,0.05)");
+  const lamp = ctx.createRadialGradient(W * 0.5, H * 0.28, 8, W * 0.5, H * 0.34, H * 0.62);
+  lamp.addColorStop(0, "rgba(232,161,90,0.28)");
+  lamp.addColorStop(0.4, "rgba(232,161,90,0.07)");
   lamp.addColorStop(1, "rgba(232,161,90,0)");
   ctx.fillStyle = lamp; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#3a2418";
-  ctx.beginPath(); ctx.ellipse(W / 2, H * 0.86, W * 0.62, H * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath(); ctx.ellipse(W / 2, H * 0.88, W * 0.5, H * 0.08, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#3d2619";
+  ctx.beginPath(); ctx.ellipse(W / 2, H * 0.92, W * 0.7, H * 0.2, 0, 0, Math.PI * 2); ctx.fill();
 }
-function roundCup(cx, cy, rw, rh) {
-  ctx.beginPath();
-  ctx.moveTo(cx - rw, cy - rh * 0.15);
-  ctx.bezierCurveTo(cx - rw, cy - rh * 0.55, cx - rw * 0.7, cy - rh * 0.55, cx, cy - rh * 0.55);
-  ctx.bezierCurveTo(cx + rw * 0.7, cy - rh * 0.55, cx + rw, cy - rh * 0.55, cx + rw, cy - rh * 0.15);
-  ctx.lineTo(cx + rw * 0.78, cy + rh * 0.55);
-  ctx.quadraticCurveTo(cx, cy + rh * 0.78, cx - rw * 0.78, cy + rh * 0.55);
-  ctx.closePath();
-}
+
 function drawSteam(x, y) {
   ctx.save(); ctx.globalCompositeOperation = "lighter";
   state.steam.forEach((s) => {
     s.p += s.s; if (s.p > 1) s.p = 0;
-    const yy = y - s.p * 90;
-    const xx = x + s.x + Math.sin(s.p * 8 + s.delay) * 10;
-    ctx.strokeStyle = `rgba(232,161,90,${(1 - s.p) * 0.22})`;
-    ctx.lineWidth = 2; ctx.beginPath();
-    ctx.moveTo(xx, yy + 16); ctx.quadraticCurveTo(xx + 8, yy + 8, xx, yy); ctx.stroke();
+    const yy = y - s.p * 110;
+    const xx = x + s.x + Math.sin(s.p * 7 + s.wiggle) * 12;
+    ctx.strokeStyle = `rgba(243,214,170,${(1 - s.p) * 0.28})`;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(xx, yy + 18); ctx.quadraticCurveTo(xx + 10, yy + 8, xx, yy); ctx.stroke();
   });
   ctx.restore();
 }
+
 function drawMug() {
-  const { x, y } = mugCenter();
-  const rw = Math.min(W * 0.22, 96), rh = rw * 0.86;
-  ctx.save(); ctx.translate(x, y);
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath(); ctx.ellipse(6, rh * 0.72, rw * 0.9, rh * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "#efe6d6"; ctx.lineWidth = 11;
-  ctx.beginPath(); ctx.arc(rw * 0.82, 8, 22, -0.7, 0.9); ctx.stroke();
-  ctx.strokeStyle = "#d7c7b0"; ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.arc(rw * 0.82, 8, 22, -0.7, 0.9); ctx.stroke();
+  const m = mug();
+  const rw = m.r, rh = m.r * 0.9;
+  ctx.save(); ctx.translate(m.x, m.y);
+  ctx.fillStyle = "rgba(0,0,0,0.38)";
+  ctx.beginPath(); ctx.ellipse(8, rh * 0.78, rw * 0.95, rh * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#efe6d6"; ctx.lineWidth = 14;
+  ctx.beginPath(); ctx.arc(rw * 0.86, 10, rw * 0.28, -0.75, 0.95); ctx.stroke();
+  ctx.strokeStyle = "#c9b496"; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.arc(rw * 0.86, 10, rw * 0.28, -0.75, 0.95); ctx.stroke();
   const body = ctx.createLinearGradient(-rw, -rh, rw, rh);
-  body.addColorStop(0, "#f7efe3"); body.addColorStop(0.5, "#eadcc8"); body.addColorStop(1, "#cbb79a");
-  ctx.fillStyle = body; roundCup(0, 10, rw, rh); ctx.fill();
-  ctx.fillStyle = "#2a1810";
-  ctx.beginPath(); ctx.ellipse(0, -rh * 0.28, rw * 0.78, rh * 0.28, 0, 0, Math.PI * 2); ctx.fill();
-  const coffee = ctx.createRadialGradient(-10, -rh * 0.34, 4, 0, -rh * 0.26, rw * 0.7);
-  coffee.addColorStop(0, "#5a3824"); coffee.addColorStop(0.55, "#2c1810"); coffee.addColorStop(1, "#1a0e0a");
+  body.addColorStop(0, "#f8f0e4"); body.addColorStop(0.55, "#e4d2b8"); body.addColorStop(1, "#b89a76");
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-rw, -rh * 0.1);
+  ctx.bezierCurveTo(-rw, -rh * 0.58, -rw * 0.62, -rh * 0.58, 0, -rh * 0.58);
+  ctx.bezierCurveTo(rw * 0.62, -rh * 0.58, rw, -rh * 0.58, rw, -rh * 0.1);
+  ctx.lineTo(rw * 0.8, rh * 0.58);
+  ctx.quadraticCurveTo(0, rh * 0.82, -rw * 0.8, rh * 0.58);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#24150f";
+  ctx.beginPath(); ctx.ellipse(0, -rh * 0.3, rw * 0.8, rh * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+  const coffee = ctx.createRadialGradient(-12, -rh * 0.36, 6, 0, -rh * 0.26, rw * 0.72);
+  coffee.addColorStop(0, "#6a4228"); coffee.addColorStop(0.5, "#2c1810"); coffee.addColorStop(1, "#140c08");
   ctx.fillStyle = coffee;
-  ctx.beginPath(); ctx.ellipse(0, -rh * 0.26, rw * 0.7, rh * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "rgba(196,160,122,0.28)";
-  ctx.beginPath(); ctx.ellipse(-rw * 0.18, -rh * 0.32, rw * 0.28, rh * 0.08, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -rh * 0.26, rw * 0.72, rh * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(212,176,132,0.32)";
+  ctx.beginPath(); ctx.ellipse(-rw * 0.2, -rh * 0.34, rw * 0.3, rh * 0.08, -0.4, 0, Math.PI * 2); ctx.fill();
+  if (state.splash > 0) {
+    ctx.fillStyle = `rgba(90,56,36,${state.splash * 0.5})`;
+    ctx.beginPath(); ctx.ellipse(0, -rh * 0.22, 34 + (1 - state.splash) * 26, 12, 0, 0, Math.PI * 2); ctx.fill();
+    state.splash -= 0.018;
+  }
   ctx.restore();
-  drawSteam(x, y - rh * 0.55);
+  drawSteam(m.x, m.y - rh * 0.62);
 }
-function drawPaperBall(x, y) {
+
+function drawScrap(x, y, t, text) {
   ctx.save(); ctx.translate(x, y);
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath(); ctx.ellipse(3, 16, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
-  const g = ctx.createRadialGradient(-6, -8, 2, 0, 0, 22);
-  g.addColorStop(0, "#f7f1e6"); g.addColorStop(0.6, "#e6d8c2"); g.addColorStop(1, "#c4b394");
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = "rgba(90,70,50,0.35)"; ctx.lineWidth = 1; ctx.beginPath();
-  ctx.moveTo(-8, -6); ctx.quadraticCurveTo(2, -2, 10, -8);
-  ctx.moveTo(-10, 4); ctx.quadraticCurveTo(0, 8, 9, 2);
-  ctx.moveTo(-2, -12); ctx.quadraticCurveTo(-4, 0, 3, 12);
-  ctx.stroke(); ctx.restore();
+  const w = 86 - t * 52, h = 38 - t * 16;
+  ctx.rotate(t * 0.4);
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.beginPath(); ctx.ellipse(2, 18, 16 + t * 4, 6, 0, 0, Math.PI * 2); ctx.fill();
+  if (t < 0.85) {
+    ctx.fillStyle = "#efe6d4";
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, -h / 2 + 4);
+    ctx.quadraticCurveTo(0, -h / 2 - 6 * t, w / 2, -h / 2 + 2);
+    ctx.lineTo(w / 2 - 4 * t, h / 2);
+    ctx.quadraticCurveTo(0, h / 2 + 8 * t, -w / 2 + 3 * t, h / 2 - 2);
+    ctx.closePath(); ctx.fill();
+    if (text && t < 0.45) {
+      ctx.fillStyle = `rgba(43,28,20,${0.55 - t})`;
+      ctx.font = "italic 11px Fraunces, Georgia, serif";
+      ctx.textAlign = "center";
+      const clip = text.length > 16 ? text.slice(0, 15) + "…" : text;
+      ctx.fillText(clip, 0, 3);
+    }
+  } else {
+    const g = ctx.createRadialGradient(-6, -7, 2, 0, 0, 22);
+    g.addColorStop(0, "#f7f1e6"); g.addColorStop(0.65, "#e2d3ba"); g.addColorStop(1, "#b89a74");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(90,70,50,0.35)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-8, -6); ctx.quadraticCurveTo(2, -2, 10, -8);
+    ctx.moveTo(-10, 4); ctx.quadraticCurveTo(0, 8, 9, 2); ctx.stroke();
+  }
+  ctx.restore();
 }
-function drawSplash() {
-  if (splash <= 0) return;
-  const { x, y } = mugCenter();
-  ctx.save(); ctx.translate(x, y - 18);
-  ctx.fillStyle = `rgba(90,56,36,${splash * 0.45})`;
-  ctx.beginPath(); ctx.ellipse(0, 0, 28 + (1 - splash) * 20, 10 + (1 - splash) * 6, 0, 0, Math.PI * 2);
-  ctx.fill(); ctx.restore(); splash -= 0.02;
-}
-function resetBall() {
-  const h = homePos();
+
+function startCrumple(text) {
+  state.thought = text;
+  state.phase = "crumple";
+  state.crumple = 0;
+  const h = home();
   state.ball = { x: h.x, y: h.y, vx: 0, vy: 0 };
+  $("line").classList.add("hide");
+  crunch();
 }
-function startHold() {
-  state.phase = "hold";
-  $("compose").classList.remove("open");
-  $("hint").classList.add("show");
-  $("hint").textContent = "Flick the scrap toward the mug";
-  resetBall();
+
+function tossIntoMug() {
+  if (!state.ball) return;
+  const m = mug();
+  state.phase = "flight";
+  state.ball.vx = (m.x - state.ball.x) * 0.045;
+  state.ball.vy = -13;
+  state.ball.life = 0;
 }
-function pointFromEvent(e) {
-  const rect = canvas.getBoundingClientRect();
-  const src = e.touches ? e.touches[0] : e;
-  return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+
+function land() {
+  if (state.phase === "rest") return;
+  state.phase = "rest";
+  state.splash = 1;
+  clink();
+  store.thoughts.unshift({
+    id: String(Date.now()),
+    text: state.thought,
+    createdAt: new Date().toISOString()
+  });
+  if (store.thoughts.length > 40) store.thoughts.length = 40;
+  save();
+  whisper("coffee has it");
+  state.dim = 0.01;
+  state.ball = null;
+  setTimeout(() => {
+    $("thought").value = "";
+    $("line").classList.remove("hide");
+    state.phase = "write";
+    state.dim = 0;
+  }, 2600);
 }
-function nearBall(p) {
+
+function stepFlight() {
+  const b = state.ball; if (!b) return;
+  b.vy += 0.38; b.x += b.vx; b.y += b.vy; b.life = (b.life || 0) + 1;
+  const m = mug();
+  const dx = m.x - b.x, dy = (m.y - 18) - b.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < m.r * 0.95) { b.vx += dx * 0.02; b.vy += dy * 0.02; }
+  if (dist < 34 || b.life > 160) land();
+}
+
+function pt(e) {
+  const r = canvas.getBoundingClientRect();
+  const s = e.touches ? e.touches[0] : e;
+  return { x: s.clientX - r.left, y: s.clientY - r.top };
+}
+function hitMug(p) {
+  const m = mug();
+  return Math.hypot(p.x - m.x, p.y - m.y) < m.r * 1.05;
+}
+function hitBall(p) {
   if (!state.ball) return false;
-  const dx = p.x - state.ball.x, dy = p.y - state.ball.y;
-  return dx * dx + dy * dy < 70 * 70;
+  return Math.hypot(p.x - state.ball.x, p.y - state.ball.y) < 56;
 }
+
+let holdTimer = 0;
 canvas.addEventListener("pointerdown", (e) => {
-  if (state.phase !== "hold" && state.phase !== "throw") return;
-  const p = pointFromEvent(e);
-  if (!nearBall(p) && state.phase === "hold" && p.y < H * 0.55) return;
-  canvas.setPointerCapture(e.pointerId);
-  state.dragging = true; state.phase = "throw";
-  state.drag = { x: p.x, y: p.y, px: p.x, py: p.y };
-  state.ball.x = p.x; state.ball.y = p.y;
-  ghost.style.display = "block"; ghost.style.left = p.x + "px"; ghost.style.top = p.y + "px";
+  const p = pt(e);
+  if (state.phase === "hold" || state.phase === "flight") {
+    if (hitBall(p) || hitMug(p)) {
+      canvas.setPointerCapture(e.pointerId);
+      state.drag = { x: p.x, y: p.y, px: p.x, py: p.y, t: Date.now() };
+      state.ball.x = p.x; state.ball.y = p.y;
+    } else tossIntoMug();
+    return;
+  }
+  if (hitMug(p)) {
+    holdTimer = setTimeout(() => {
+      $("wake").value = `${String(store.wakeHour).padStart(2,"0")}:${String(store.wakeMinute).padStart(2,"0")}`;
+      $("settings").classList.add("open");
+    }, 650);
+  }
 });
 canvas.addEventListener("pointermove", (e) => {
-  if (!state.dragging) return;
-  const p = pointFromEvent(e);
+  if (!state.drag) return;
+  const p = pt(e);
   state.drag.px = state.drag.x; state.drag.py = state.drag.y;
   state.drag.x = p.x; state.drag.y = p.y;
   state.ball.x = p.x; state.ball.y = p.y;
-  ghost.style.left = p.x + "px"; ghost.style.top = p.y + "px";
 });
 function release() {
-  if (!state.dragging) return;
-  state.dragging = false; ghost.style.display = "none";
-  let vx = (state.drag.x - state.drag.px) * 1.8;
-  let vy = (state.drag.y - state.drag.py) * 1.8;
-  state.ball.vx = Math.max(-18, Math.min(18, vx));
-  state.ball.vy = Math.max(-24, Math.min(8, vy - 6));
-  if (Math.hypot(state.ball.vx, state.ball.vy) < 6) {
-    state.ball.vy = -11;
-    state.ball.vx = (mugCenter().x - state.ball.x) * 0.03;
-  }
+  clearTimeout(holdTimer);
+  if (!state.drag || !state.ball) { state.drag = null; return; }
+  const dt = Date.now() - state.drag.t;
+  const vx = (state.drag.x - state.drag.px) * 1.7;
+  const vy = (state.drag.y - state.drag.py) * 1.7;
+  state.drag = null;
+  if (dt < 180 || Math.hypot(vx, vy) < 4) { tossIntoMug(); return; }
   state.phase = "flight";
-  $("hint").classList.remove("show");
+  state.ball.vx = Math.max(-16, Math.min(16, vx));
+  state.ball.vy = Math.max(-22, Math.min(4, vy - 5));
+  state.ball.life = 0;
 }
 canvas.addEventListener("pointerup", release);
 canvas.addEventListener("pointercancel", release);
-function stepFlight() {
-  const b = state.ball; if (!b) return;
-  b.vy += 0.42; b.x += b.vx; b.y += b.vy; b.vx *= 0.995;
-  const m = mugCenter();
-  const dx = m.x - b.x, dy = (m.y - 12) - b.y, dist = Math.hypot(dx, dy);
-  if (dist < 90 && b.vy > -2) { b.vx += dx * 0.012; b.vy += dy * 0.012; }
-  if (dist < 36) { land(); return; }
-  if (b.y > H * 0.9 || b.x < -40 || b.x > W + 40) {
-    b.x = Math.max(30, Math.min(W - 30, b.x));
-    b.vx = (m.x - b.x) * 0.05; b.vy = -10;
-  }
-  b._life = (b._life || 0) + 1;
-  if (b._life > 180) land();
+
+$("thought").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); maybeCrumple(); }
+});
+$("thought").addEventListener("blur", () => { if ($("thought").value.trim()) maybeCrumple(); });
+function maybeCrumple() {
+  const text = $("thought").value.trim();
+  if (!text || state.phase !== "write") return;
+  startCrumple(text);
 }
-function land() {
-  state.phase = "landed"; splash = 1; buzz(18);
-  store.thoughts.unshift({
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-    text: state.thought.trim(), nextSip: state.sip.trim(),
-    createdAt: new Date().toISOString(), opensAt: nextOpen(), status: "parked"
-  });
-  save(store);
-  state.laterCount += 1;
-  $("again").style.display = state.laterCount >= 2 ? "none" : "block";
-  $("landed").classList.add("open");
-  const m = mugCenter(); state.ball = { x: m.x, y: m.y - 8, vx: 0, vy: 0 };
-}
+
+$("mark").addEventListener("click", () => {
+  $("wake").value = `${String(store.wakeHour).padStart(2,"0")}:${String(store.wakeMinute).padStart(2,"0")}`;
+  $("settings").classList.toggle("open");
+});
+$("saveSet").addEventListener("click", () => {
+  const [hh, mm] = ($("wake").value || "06:30").split(":").map(Number);
+  store.wakeHour = hh; store.wakeMinute = mm; save();
+  $("settings").classList.remove("open");
+});
+
 function loop() {
-  drawWood(); drawMug(); drawSplash();
-  if (state.ball && !state.dragging && state.phase !== "landed") {
-    if (state.phase === "flight") stepFlight();
-    if (state.phase === "hold" || state.phase === "throw" || state.phase === "flight") {
-      drawPaperBall(state.ball.x, state.ball.y);
+  drawRoom(); drawMug();
+  if (state.phase === "crumple") {
+    state.crumple += 0.045;
+    drawScrap(state.ball.x, state.ball.y, Math.min(1, state.crumple), state.thought);
+    if (state.crumple >= 1) {
+      state.phase = "hold";
+      whisper("tap the mug", 1600);
     }
+  } else if (state.ball && state.phase !== "rest") {
+    if (state.phase === "flight") stepFlight();
+    if (state.ball) drawScrap(state.ball.x, state.ball.y, 1, state.thought);
+  }
+  if (state.dim > 0) {
+    ctx.fillStyle = `rgba(10,6,4,${Math.min(0.35, state.dim)})`;
+    ctx.fillRect(0, 0, W, H);
+    state.dim += 0.008;
   }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
-function resetCompose(keepCount = true) {
-  state.phase = "compose"; state.thought = ""; state.sip = "";
-  $("thought").value = ""; $("sip").value = "";
-  $("compose").classList.add("open");
-  $("landed").classList.remove("open");
-  $("hint").classList.remove("show");
-  if (!keepCount) state.laterCount = 0;
-}
-$("crumple").addEventListener("click", () => {
-  const text = $("thought").value.trim();
-  if (!text) { $("thought").focus(); return; }
-  state.thought = text; state.sip = $("sip").value.trim();
-  buzz(8); startHold();
-});
-$("done").addEventListener("click", () => { $("landed").classList.remove("open"); resetCompose(false); });
-$("again").addEventListener("click", () => { $("landed").classList.remove("open"); resetCompose(true); });
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&", "<": "<", ">": ">", '"': """, "'": "&#39;" }[c]));
-}
-function renderCards() {
-  const now = Date.now();
-  const ready = store.thoughts.filter((t) => t.status === "parked" && new Date(t.opensAt).getTime() <= now);
-  const el = $("cards");
-  if (!ready.length) { el.innerHTML = ""; $("listTitle").textContent = "Nothing in the mug"; return; }
-  $("listTitle").textContent = "In the mug";
-  el.innerHTML = ready.map((t) => `<article class="card" data-id="${t.id}"><p>${escapeHtml(t.text)}</p>${t.nextSip ? `<small>Next sip: ${escapeHtml(t.nextSip)}</small>` : ""}<div class="tiny"><button data-act="handle">Handled</button><button class="keep" data-act="keep">Keep for tomorrow</button></div></article>`).join("");
-}
-$("cards").addEventListener("click", (e) => {
-  const btn = e.target.closest("button"); if (!btn) return;
-  const id = btn.closest(".card").dataset.id;
-  const t = store.thoughts.find((x) => x.id === id); if (!t) return;
-  if (btn.dataset.act === "handle") t.status = "handled";
-  if (btn.dataset.act === "keep") t.opensAt = nextOpen();
-  save(store); renderCards();
-});
-function openMorning() {
-  $("compose").classList.remove("open"); $("landed").classList.remove("open");
-  if (!isMorningNow()) { $("locked").classList.add("open"); $("list").classList.remove("open"); return; }
-  $("locked").classList.remove("open"); renderCards(); $("list").classList.add("open");
-}
-function openLater() {
-  $("locked").classList.remove("open"); $("list").classList.remove("open"); $("settings").classList.remove("open");
-  $("btnLater").classList.add("on"); $("btnMorning").classList.remove("on");
-  state.mode = "later"; resetCompose(false);
-}
-$("btnLater").addEventListener("click", openLater);
-$("btnMorning").addEventListener("click", () => {
-  $("btnMorning").classList.add("on"); $("btnLater").classList.remove("on");
-  state.mode = "morning"; openMorning();
-});
-$("backLater").addEventListener("click", openLater);
-$("closeList").addEventListener("click", openLater);
-$("gear").addEventListener("click", () => {
-  $("settings").classList.add("open");
-  $("wake").value = `${String(store.wakeHour).padStart(2, "0")}:${String(store.wakeMinute).padStart(2, "0")}`;
-  $("haptics").checked = store.haptics;
-});
-$("saveSet").addEventListener("click", () => {
-  const [hh, mm] = ($("wake").value || "06:30").split(":").map(Number);
-  store.wakeHour = hh; store.wakeMinute = mm; store.haptics = $("haptics").checked;
-  save(store); $("settings").classList.remove("open");
-});
-$("clearAll").addEventListener("click", () => { store.thoughts = []; save(store); $("settings").classList.remove("open"); });
+
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
