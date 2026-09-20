@@ -1,13 +1,22 @@
-const KEY = "over-coffee-v6";
+const KEY = "over-coffee-v7";
 const $ = (id) => document.getElementById(id);
 const R = 18;
+const TOOLS = {
+  pencil: { color: "rgba(60,42,30,0.72)", width: 1.8, jitter: 0.35 },
+  pen: { color: "rgba(28,36,70,0.88)", width: 2.4, jitter: 0 },
+  crayon: { color: "rgba(176,62,48,0.78)", width: 7.5, jitter: 0.9 },
+  marker: { color: "rgba(40,92,74,0.55)", width: 11, jitter: 0 }
+};
 
 function load() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
-    return { sound: raw.sound === true };
+    return {
+      sound: raw.sound === true,
+      tool: TOOLS[raw.tool] ? raw.tool : "pencil"
+    };
   } catch {
-    return { sound: false };
+    return { sound: false, tool: "pencil" };
   }
 }
 function save() { localStorage.setItem(KEY, JSON.stringify(store)); }
@@ -48,17 +57,16 @@ const mug = () => ({ x: W * 0.5, y: H * 0.34, r: Math.min(W * 0.26, 118) });
 function paperBox() {
   const w = Math.min(W * 0.7, 268);
   const h = w * 0.62;
-  return { x: (W - w) / 2, y: H * 0.58, w, h };
+  return { x: (W - w) / 2, y: H * 0.56, w, h };
 }
-function nest() {
-  return { x: W * 0.5, y: H * 0.78 };
-}
+function nest() { return { x: W * 0.5, y: H * 0.78 }; }
 function cup() {
   const m = mug();
   return { x: m.x, y: m.y - m.r * 0.22 };
 }
-function hasInk() { return state.strokes.some((s) => s.length > 2); }
+function hasInk() { return state.strokes.some((s) => s.pts.length > 2); }
 function showWrap(on) { $("wrap").classList.toggle("hide", !on); }
+function showKit(on) { $("kit").classList.toggle("away", !on); }
 
 state.steam = Array.from({ length: 14 }, (_, i) => ({
   p: Math.random(), x: (Math.random() - 0.5) * 36,
@@ -135,17 +143,33 @@ function drawMug() {
   ctx.restore();
   drawSteam(m.x, m.y - rh * 0.62);
 }
+function xy(box, p) {
+  return { x: box.x + p.u * box.w, y: box.y + p.v * box.h };
+}
 function drawInk(box) {
   ctx.save();
   ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
-  ctx.strokeStyle = "rgba(43,28,20,0.8)";
-  ctx.lineWidth = 4.2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
   state.strokes.forEach((s) => {
-    if (s.length < 2) return;
+    const t = TOOLS[s.tool] || TOOLS.pencil;
+    if (s.pts.length < 2) return;
+    ctx.strokeStyle = t.color;
+    ctx.lineWidth = t.width;
     ctx.beginPath();
-    ctx.moveTo(box.x + s[0].u * box.w, box.y + s[0].v * box.h);
-    for (let i = 1; i < s.length; i++) ctx.lineTo(box.x + s[i].u * box.w, box.y + s[i].v * box.h);
+    const a = xy(box, s.pts[0]);
+    ctx.moveTo(a.x, a.y);
+    for (let i = 1; i < s.pts.length; i++) {
+      const p = xy(box, s.pts[i]);
+      const j = t.jitter || 0;
+      ctx.lineTo(p.x + (j ? Math.sin(i * 2.1) * j : 0), p.y + (j ? Math.cos(i * 1.7) * j : 0));
+    }
     ctx.stroke();
+    if (s.tool === "crayon") {
+      ctx.globalAlpha = 0.25;
+      ctx.lineWidth = t.width + 3;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   });
   ctx.restore();
 }
@@ -204,6 +228,7 @@ function wrapNow() {
   state.ball = { x: n.x, y: n.y, t: 0 };
   state.phase = "hold";
   showWrap(false);
+  showKit(false);
 }
 function fire() {
   const b = state.ball, n = state.nest;
@@ -213,7 +238,7 @@ function fire() {
   const c = cup();
   b.from = { x: b.x, y: b.y };
   b.to = { x: c.x, y: c.y };
-  b.mid = { x: (b.x + c.x) / 2, y: Math.min(b.y, c.y) - 40 - pull * 0.15 };
+  b.mid = { x: (b.x + c.x) / 2, y: Math.min(b.y, c.y) - 50 - pull * 0.18 };
   b.t = 0;
   state.phase = "flight";
   state.dragging = false;
@@ -227,11 +252,12 @@ function land() {
     state.phase = "write";
     state.strokes = [];
     showWrap(false);
-  }, 350);
+    showKit(true);
+  }, 450);
 }
 function stepFlight() {
   const b = state.ball; if (!b) return;
-  b.t = Math.min(1, b.t + 0.09);
+  b.t = Math.min(1, b.t + 0.028);
   const u = b.t * b.t * (3 - 2 * b.t);
   const a = b.from, m = b.mid, c = b.to;
   const o = 1 - u;
@@ -248,7 +274,7 @@ canvas.addEventListener("pointerdown", (e) => {
     if (now - state.lastTap < 300 && hasInk()) { wrapNow(); return; }
     state.lastTap = now;
     state.drawing = true;
-    state.strokes.push([toUV(p)]);
+    state.strokes.push({ tool: store.tool, pts: [toUV(p)] });
     return;
   }
   if ((state.phase === "hold" || state.phase === "flight") && hitBall(p)) {
@@ -259,7 +285,7 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointermove", (e) => {
   const p = pt(e);
   if (state.drawing && state.phase === "write") {
-    state.strokes[state.strokes.length - 1].push(toUV(p));
+    state.strokes[state.strokes.length - 1].pts.push(toUV(p));
     if (hasInk()) showWrap(true);
     return;
   }
@@ -282,6 +308,20 @@ function up() {
 }
 canvas.addEventListener("pointerup", up);
 canvas.addEventListener("pointercancel", up);
+
+function paintTools() {
+  document.querySelectorAll(".tool").forEach((el) => {
+    el.classList.toggle("on", el.dataset.tool === store.tool);
+  });
+}
+paintTools();
+document.querySelectorAll(".tool").forEach((el) => {
+  el.addEventListener("click", () => {
+    store.tool = el.dataset.tool;
+    save();
+    paintTools();
+  });
+});
 
 $("wrap").addEventListener("click", wrapNow);
 $("mark").addEventListener("click", () => {
