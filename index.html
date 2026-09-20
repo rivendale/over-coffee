@@ -13,28 +13,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,420;0,9..144,560;1,9..144,420&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="app.css?v=10" />
+  <link rel="stylesheet" href="app.css?v=11" />
 </head>
 <body>
   <div id="app">
     <canvas id="scene"></canvas>
     <p class="mark" id="mark">Over Coffee</p>
-    <div class="kit" id="kit">
-      <button class="tool on" data-tool="pencil" type="button">pencil</button>
-      <button class="tool" data-tool="pen" type="button">pen</button>
-      <button class="tool" data-tool="crayon" type="button">crayon</button>
-      <button class="tool" data-tool="marker" type="button">marker</button>
+    <div class="rooms" id="scenes">
+      <button data-scene="lamp" type="button" title="Lamp"></button>
+      <button data-scene="japan" type="button" title="Japan"></button>
+      <button data-scene="country" type="button" title="Country"></button>
+      <button data-scene="shore" type="button" title="Shore"></button>
+      <button data-scene="garden" type="button" title="Garden"></button>
     </div>
-    <button class="wrap hide" id="wrap" type="button">wrap</button>
+    <div class="kit" id="kit">
+      <button class="tool on" data-tool="pencil" type="button" title="Pencil"></button>
+      <button class="tool" data-tool="pen" type="button" title="Pen"></button>
+      <button class="tool" data-tool="crayon" type="button" title="Crayon"></button>
+      <button class="tool" data-tool="marker" type="button" title="Marker"></button>
+      <button class="wrap hide" id="wrap" type="button">wrap</button>
+    </div>
     <div class="settings" id="settings">
-      <p>Room</p>
-      <div class="scenes" id="scenes">
-        <button data-scene="lamp" type="button">Lamp</button>
-        <button data-scene="japan" type="button">Japan</button>
-        <button data-scene="country" type="button">Country</button>
-        <button data-scene="shore" type="button">Shore</button>
-        <button data-scene="garden" type="button">Garden</button>
-      </div>
       <p>Sound</p>
       <div class="picks">
         <button id="soundOff" type="button">Off</button>
@@ -43,6 +42,6 @@
       <button class="ok" id="saveSet" type="button">Alright</button>
     </div>
   </div>
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
