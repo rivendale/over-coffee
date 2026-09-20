@@ -18,7 +18,7 @@ let store = load();
 
 const canvas = $("scene");
 const ctx = canvas.getContext("2d");
-let W = 0, H = 0, dpr = 1;
+let W = 360, H = 640, dpr = 1;
 const state = {
   phase: "write",
   thought: "",
@@ -27,20 +27,24 @@ const state = {
   drag: null,
   splash: 0,
   dim: 0,
-  steam: [],
-  scraps: []
+  steam: []
 };
 
 function resize() {
   const app = $("app");
   dpr = Math.min(window.devicePixelRatio || 1, 2);
-  W = app.clientWidth; H = app.clientHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  W = Math.max(app.clientWidth || 0, window.innerWidth || 0, 320);
+  H = Math.max(app.clientHeight || 0, window.innerHeight || 0, 560);
+  canvas.width = Math.floor(W * dpr);
+  canvas.height = Math.floor(H * dpr);
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resize();
+requestAnimationFrame(resize);
 window.addEventListener("resize", resize);
+window.addEventListener("load", resize);
 
 const mug = () => ({ x: W * 0.5, y: H * 0.42, r: Math.min(W * 0.28, 128) });
 const home = () => ({ x: W * 0.5, y: H * 0.72 });
@@ -167,7 +171,7 @@ function drawScrap(x, y, t, text) {
       ctx.fillStyle = `rgba(43,28,20,${0.55 - t})`;
       ctx.font = "italic 11px Fraunces, Georgia, serif";
       ctx.textAlign = "center";
-      const clip = text.length > 16 ? text.slice(0, 15) + "…" : text;
+      const clip = text.length > 16 ? text.slice(0, 15) + "..." : text;
       ctx.fillText(clip, 0, 3);
     }
   } else {
@@ -205,11 +209,7 @@ function land() {
   state.phase = "rest";
   state.splash = 1;
   clink();
-  store.thoughts.unshift({
-    id: String(Date.now()),
-    text: state.thought,
-    createdAt: new Date().toISOString()
-  });
+  store.thoughts.unshift({ id: String(Date.now()), text: state.thought, createdAt: new Date().toISOString() });
   if (store.thoughts.length > 40) store.thoughts.length = 40;
   save();
   whisper("coffee has it");
